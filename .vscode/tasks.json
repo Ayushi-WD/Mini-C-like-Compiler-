@@ -1,0 +1,83 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build compiler",
+            "type": "shell",
+            "command": "gcc",
+            "args": [
+                "src/main.c",
+                "-o",
+                "compiler.exe"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": ["$gcc"]
+        },
+        {
+            "label": "run compiler",
+            "type": "shell",
+            "command": "compiler.exe",
+            "args": [
+                "tests/test1.cmini",
+                "outputs/program.asm"
+            ],
+            "dependsOn": ["build compiler"]
+        },
+        {
+            "label": "assemble",
+            "type": "shell",
+            "command": "nasm",
+            "args": [
+                "-f",
+                "win32",
+                "outputs/program.asm",
+                "-o",
+                "outputs/program.obj"
+            ]
+        },
+        {
+            "label": "compile driver",
+            "type": "shell",
+            "command": "gcc",
+            "args": [
+                "-c",
+                "runtime/driver.c",
+                "-o",
+                "outputs/driver.obj"
+            ]
+        },
+        {
+            "label": "link",
+            "type": "shell",
+            "command": "gcc",
+            "args": [
+                "outputs/driver.obj",
+                "outputs/program.obj",
+                "-o",
+                "outputs/program.exe"
+            ]
+        },
+        {
+            "label": "run program",
+            "type": "shell",
+            "command": "outputs/program.exe"
+        },
+        {
+            "label": "build and run all",
+            "dependsOn": [
+                "run compiler",
+                "assemble",
+                "compile driver",
+                "link",
+                "run program"
+            ],
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            }
+        }
+    ]
+}
