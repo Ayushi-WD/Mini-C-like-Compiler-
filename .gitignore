@@ -1,0 +1,13 @@
+.vscode/
+.idea/
+
+# Build outputs / binaries
+outputs/
+*.exe
+*.obj
+*.asm
+*.class
+
+# OS cruft
+Thumbs.db
+Desktop.ini
