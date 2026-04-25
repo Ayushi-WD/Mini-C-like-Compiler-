@@ -1,10 +1,12 @@
 #include <stdio.h>
 
-// This function will be implemented in our generated assembly code.
 extern int our_code();
 
+void print_int(int value) {
+    printf("%d\n", value);
+}
+
 int main() {
-    int result = our_code();
-    printf("%d\n", result);
+    our_code();
     return 0;
 }

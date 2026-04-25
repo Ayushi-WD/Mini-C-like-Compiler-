@@ -1,0 +1,16 @@
+int x = 10;
+int y = 20;
+int z = x + y;
+print z;
+
+if (z > 25) {
+    print 100;
+} else {
+    print 0;
+}
+
+int i = 1;
+while (i <= 5) {
+    print i;
+    i = i + 1;
+}

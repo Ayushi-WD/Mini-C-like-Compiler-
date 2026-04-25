@@ -1,0 +1,15 @@
+int a = 5 + 3 * 2;
+int b = 10 * 2;
+int c = 8 / 4;
+int d = 2 * 2 * 2;
+int e = a + 0;
+int f = b * 1;
+int g = c * 0;
+
+print a;
+print b;
+print c;
+print d;
+print e;
+print f;
+print g;
