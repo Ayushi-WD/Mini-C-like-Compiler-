@@ -1,2 +1,2 @@
 int x = 10
-print x       // ERROR: Missing semicolon
+print x       

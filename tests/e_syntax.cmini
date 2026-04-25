@@ -1,2 +1,2 @@
-int x = ;      // ERROR: Missing expression after =
+int x = ;      
 print x;

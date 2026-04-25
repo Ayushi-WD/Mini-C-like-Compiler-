@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Mini C-like Compiler — Write, compile, and visualize C-mini code with lexical analysis, parsing, and x86 assembly generation.">
+    <title>Mini C Compiler — Interactive IDE</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+    
+    <div class="bg-orb bg-orb-1" aria-hidden="true"></div>
+    <div class="bg-orb bg-orb-2" aria-hidden="true"></div>
+    <div class="bg-orb bg-orb-3" aria-hidden="true"></div>
+
+    
+    <header id="app-header">
+        <div class="header-left">
+            <div class="logo-mark" aria-hidden="true">
+                <span class="logo-bracket">{</span>
+                <span class="logo-icon">⚡</span>
+                <span class="logo-bracket">}</span>
+            </div>
+            <div class="header-title-group">
+                <h1>Mini C Compiler</h1>
+                <span class="header-subtitle">Lexer · Parser · x86 Code Generator</span>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="status-indicator" id="statusIndicator">
+                <span class="status-dot"></span>
+                <span class="status-text" id="statusText">Ready</span>
+            </div>
+        </div>
+    </header>
+
+    
+    <nav id="toolbar" aria-label="Compiler Actions">
+        <div class="toolbar-group toolbar-left">
+            <div class="example-dropdown-wrapper">
+                <button class="btn btn-secondary" id="btnExamples" aria-haspopup="true" aria-expanded="false">
+                    <span class="btn-icon">📂</span>
+                    <span>Examples</span>
+                    <span class="dropdown-arrow">▾</span>
+                </button>
+                <div class="dropdown-menu" id="examplesDropdown" role="menu">
+                    
+                </div>
+            </div>
+        </div>
+        <div class="toolbar-group toolbar-center">
+            <button class="btn btn-primary btn-compile" id="btnCompile">
+                <span class="btn-icon">▶</span>
+                <span>Compile</span>
+            </button>
+            <button class="btn btn-success" id="btnRun">
+                <span class="btn-icon">🚀</span>
+                <span>Run</span>
+            </button>
+            <button class="btn btn-accent" id="btnTokenize">
+                <span class="btn-icon">🔤</span>
+                <span>Tokenize</span>
+            </button>
+            <button class="btn btn-secondary" id="btnClear">
+                <span class="btn-icon">🗑️</span>
+                <span>Clear</span>
+            </button>
+        </div>
+        <div class="toolbar-group toolbar-right">
+            <input type="file" id="fileUpload" accept=".cmini,.c,.txt" style="display:none">
+            <button class="btn btn-secondary" id="btnUpload" title="Upload local file">
+                <span class="btn-icon">📤</span>
+                <span>Upload</span>
+            </button>
+            <div class="example-dropdown-wrapper">
+                <button class="btn btn-secondary" id="btnExport" aria-haspopup="true" aria-expanded="false" title="Export files">
+                    <span class="btn-icon">📥</span>
+                    <span>Export</span>
+                    <span class="dropdown-arrow">▾</span>
+                </button>
+                <div class="dropdown-menu" id="exportDropdown" role="menu">
+                    <button class="dropdown-item" id="exportCmini">Download Source (.cmini)</button>
+                    <button class="dropdown-item" id="exportAsm">Download Assembly (.asm)</button>
+                </div>
+            </div>
+            <button class="btn btn-ghost" id="btnThemeToggle" title="Toggle theme">
+                <span class="btn-icon" id="themeIcon">🌙</span>
+            </button>
+        </div>
+    </nav>
+
+    
+    <main id="workspace">
+        
+        <section class="panel panel-editor" id="editorPanel">
+            <div class="panel-header">
+                <div class="panel-tab active">
+                    <span class="panel-tab-dot" style="background: #f472b6;"></span>
+                    source.cmini
+                </div>
+                <div class="panel-actions">
+                    <span class="line-col-info" id="lineColInfo">Ln 1, Col 1</span>
+                </div>
+            </div>
+            <div class="editor-container" id="editorContainer">
+                <div class="line-numbers" id="lineNumbers" aria-hidden="true"></div>
+                <textarea id="sourceEditor" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"
+                    placeholder="// Write your C-mini code here...&#10;&#10;int x = 10;&#10;int y = 20;&#10;print x + y;"></textarea>
+            </div>
+        </section>
+
+        
+        <section class="panel panel-output" id="outputPanel">
+            <div class="panel-header">
+                <button class="panel-tab active" data-tab="assembly" id="tabAssembly">
+                    <span class="panel-tab-dot" style="background: #34d399;"></span>
+                    Assembly
+                </button>
+                <button class="panel-tab" data-tab="tokens" id="tabTokens">
+                    <span class="panel-tab-dot" style="background: #60a5fa;"></span>
+                    Tokens
+                </button>
+                <button class="panel-tab" data-tab="symbols" id="tabSymbols">
+                    <span class="panel-tab-dot" style="background: #fbbf24;"></span>
+                    Symbols
+                </button>
+                <button class="panel-tab" data-tab="console" id="tabConsole">
+                    <span class="panel-tab-dot" style="background: #a78bfa;"></span>
+                    Console
+                    <span class="console-badge" id="consoleBadge" style="display:none;">0</span>
+                </button>
+            </div>
+            <div class="tab-content active" id="contentAssembly">
+                <pre id="assemblyOutput" class="output-pre"><span class="output-placeholder">; Assembly output will appear here after compilation
+;
+; Click "Compile" or press Ctrl+Enter to compile your code</span></pre>
+            </div>
+            <div class="tab-content" id="contentTokens">
+                <div id="tokensOutput" class="tokens-grid">
+                    <div class="output-placeholder-wrapper">
+                        <span class="output-placeholder">Click "Tokenize" to see the lexical analysis output</span>
+                    </div>
+                </div>
+            </div>
+            <div class="tab-content" id="contentSymbols">
+                <div id="symbolsOutput" class="symbols-container">
+                    <div class="output-placeholder-wrapper">
+                        <span class="output-placeholder">Symbol table will appear here after compilation</span>
+                    </div>
+                </div>
+            </div>
+            <div class="tab-content" id="contentConsole">
+                <pre id="consoleOutput" class="output-pre console-pre"><span class="output-placeholder">Compiler console output will appear here...</span></pre>
+            </div>
+        </section>
+    </main>
+
+    
+    <section id="pipeline" aria-label="Compilation Pipeline">
+        <div class="pipeline-step" id="pipelineStep1" data-step="1">
+            <div class="pipeline-icon">📝</div>
+            <div class="pipeline-label">Source Code</div>
+        </div>
+        <div class="pipeline-arrow" aria-hidden="true">
+            <svg width="40" height="16" viewBox="0 0 40 16">
+                <path d="M0 8 L30 8 M24 2 L32 8 L24 14" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <div class="pipeline-step" id="pipelineStep2" data-step="2">
+            <div class="pipeline-icon">🔤</div>
+            <div class="pipeline-label">Lexer</div>
+        </div>
+        <div class="pipeline-arrow" aria-hidden="true">
+            <svg width="40" height="16" viewBox="0 0 40 16">
+                <path d="M0 8 L30 8 M24 2 L32 8 L24 14" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <div class="pipeline-step" id="pipelineStep3" data-step="3">
+            <div class="pipeline-icon">🌳</div>
+            <div class="pipeline-label">Parser</div>
+        </div>
+        <div class="pipeline-arrow" aria-hidden="true">
+            <svg width="40" height="16" viewBox="0 0 40 16">
+                <path d="M0 8 L30 8 M24 2 L32 8 L24 14" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <div class="pipeline-step" id="pipelineStep4" data-step="4">
+            <div class="pipeline-icon">⚙️</div>
+            <div class="pipeline-label">Code Gen</div>
+        </div>
+        <div class="pipeline-arrow" aria-hidden="true">
+            <svg width="40" height="16" viewBox="0 0 40 16">
+                <path d="M0 8 L30 8 M24 2 L32 8 L24 14" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <div class="pipeline-step" id="pipelineStep5" data-step="5">
+            <div class="pipeline-icon">💾</div>
+            <div class="pipeline-label">x86 ASM</div>
+        </div>
+    </section>
+
+    
+    <footer id="app-footer">
+        <span>Mini C Compiler &mdash; Phase 3 &mdash; Lexer + Parser + x86 Code Generator + Simulator</span>
+    </footer>
+
+    <script src="compiler.js"></script>
+    <script src="simulator.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

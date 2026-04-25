@@ -2,8 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <stdarg.h>
 
-// Token types
+
 typedef enum {
     TOKEN_NUMBER,
     TOKEN_PLUS, TOKEN_MINUS, TOKEN_STAR, TOKEN_SLASH,
@@ -19,14 +20,14 @@ typedef enum {
     TOKEN_EOF
 } TokenType;
 
-// Token structure
+
 typedef struct {
     TokenType type;
     int value;
     char name[100];
 } Token;
 
-// Symbol table for variables
+
 typedef struct {
     char name[100];
     int value;
@@ -36,14 +37,15 @@ typedef struct {
     int array_size;
 } Symbol;
 
-// Global variables
+
 char *input;
 int position = 0;
 int current_line = 1;
 Token current_token;
 FILE *asm_file;
-Symbol symbol_table[100];
-Symbol saved_symbol_table[100];
+#define MAX_SYMBOLS 1000
+Symbol symbol_table[MAX_SYMBOLS];
+Symbol saved_symbol_table[MAX_SYMBOLS];
 int symbol_count = 0;
 int saved_symbol_count = 0;
 int label_counter = 0;
@@ -51,10 +53,30 @@ int error_count = 0;
 int pass_number = 1;
 int stop_compilation = 0;
 
-// Helper macro
-#define EMIT(...) do { if (asm_file && pass_number == 2 && !stop_compilation) fprintf(asm_file, __VA_ARGS__); } while (0)
 
-// Error reporting functions
+#define MAX_INSTRUCTIONS 5000
+char *instruction_buffer[MAX_INSTRUCTIONS];
+int instruction_count = 0;
+
+void emit_instruction(const char *format, ...) {
+    if (pass_number != 2 || error_count > 0) return;
+    
+    char buffer[256];
+    va_list args;
+    va_start(args, format);
+    vsnprintf(buffer, sizeof(buffer), format, args);
+    va_end(args);
+    
+    if (instruction_count < MAX_INSTRUCTIONS) {
+        char *s = strdup(buffer);
+        if (s) instruction_buffer[instruction_count++] = s;
+    }
+}
+
+
+#define EMIT(...) emit_instruction(__VA_ARGS__)
+
+
 void report_error(const char *message, const char *detail) {
     printf("\n ERROR at line %d: %s", current_line, message);
     if (detail && strlen(detail) > 0) {
@@ -62,7 +84,6 @@ void report_error(const char *message, const char *detail) {
     }
     printf("\n");
     error_count++;
-    stop_compilation = 1;
 }
 
 void report_syntax_error(const char *expected, const char *found) {
@@ -70,16 +91,14 @@ void report_syntax_error(const char *expected, const char *found) {
     printf("   Expected: %s\n", expected);
     printf("   Found: %s\n", found);
     error_count++;
-    stop_compilation = 1;
 }
 
 void report_semantic_error(const char *message) {
     printf("\n SEMANTIC ERROR at line %d: %s\n", current_line, message);
     error_count++;
-    stop_compilation = 1;
 }
 
-// Function prototypes
+
 void next_token();
 void eat(TokenType type);
 void parse_program();
@@ -130,7 +149,7 @@ void restore_symbols() {
     }
 }
 
-// Symbol table functions
+
 void add_symbol(char *name, int value, int line, int is_array, int array_size) {
     if (stop_compilation) return;
     
@@ -140,13 +159,18 @@ void add_symbol(char *name, int value, int line, int is_array, int array_size) {
             return;
         }
     }
-    strcpy(symbol_table[symbol_count].name, name);
-    symbol_table[symbol_count].value = value;
-    symbol_table[symbol_count].initialized = 1;
-    symbol_table[symbol_count].line = line;
-    symbol_table[symbol_count].is_array = is_array;
-    symbol_table[symbol_count].array_size = array_size;
-    symbol_count++;
+    if (symbol_count < MAX_SYMBOLS) {
+        strncpy(symbol_table[symbol_count].name, name, 99);
+        symbol_table[symbol_count].name[99] = '\0';
+        symbol_table[symbol_count].value = value;
+        symbol_table[symbol_count].initialized = 0;
+        symbol_table[symbol_count].line = line;
+        symbol_table[symbol_count].is_array = is_array;
+        symbol_table[symbol_count].array_size = array_size;
+        symbol_count++;
+    } else {
+        report_error("Symbol table overflow", "Too many variables");
+    }
 }
 
 int get_symbol(char *name) {
@@ -221,7 +245,7 @@ const char* token_to_string(TokenType type) {
     }
 }
 
-// Lexer
+
 void next_token() {
     while (input[position] == ' ' || input[position] == '\n' ||
            input[position] == '\r' || input[position] == '\t') {
@@ -234,10 +258,11 @@ void next_token() {
         return;
     }
 
-    if (isalpha(input[position])) {
+    if (isalpha(input[position]) || input[position] == '_') {
         int start = position;
-        while (isalnum(input[position])) position++;
+        while (isalnum(input[position]) || input[position] == '_') position++;
         int len = position - start;
+        if (len > 99) len = 99; 
         char word[100];
         strncpy(word, &input[start], len);
         word[len] = '\0';
@@ -324,7 +349,7 @@ void next_token() {
 }
 
 void eat(TokenType type) {
-    if (stop_compilation) return;
+    
     
     if (current_token.type == type) {
         next_token();
@@ -388,7 +413,7 @@ void parse_declaration() {
     if (current_token.type == TOKEN_ASSIGN) {
         eat(TOKEN_ASSIGN);
         if (current_token.type == TOKEN_LBRACE && is_array) {
-            // Array initialization: int arr[5] = {1, 2, 3, 4, 5};
+            
             eat(TOKEN_LBRACE);
             for (int i = 0; i < array_size; i++) {
                 int init_val = current_token.value;
@@ -409,12 +434,11 @@ void parse_declaration() {
         add_symbol(var_name, 0, current_line, is_array, array_size);
     }
     
-    // Check for semicolon
+    
     if (current_token.type == TOKEN_SEMICOLON) {
         eat(TOKEN_SEMICOLON);
     } else {
         report_syntax_error("';'", token_to_string(current_token.type));
-        stop_compilation = 1;
     }
 }
 
@@ -426,50 +450,31 @@ void parse_assignment() {
     eat(TOKEN_IDENTIFIER);
     
     int is_array_access = 0;
-    char index_name[100] = "";
-    int array_index = 0;
-    int is_variable_index = 0;
     
     if (current_token.type == TOKEN_LBRACKET) {
         is_array_access = 1;
         eat(TOKEN_LBRACKET);
-        
-        if (current_token.type == TOKEN_NUMBER) {
-            array_index = current_token.value;
-            eat(TOKEN_NUMBER);
-            is_variable_index = 0;
-        } else if (current_token.type == TOKEN_IDENTIFIER) {
-            strcpy(index_name, current_token.name);
-            eat(TOKEN_IDENTIFIER);
-            is_variable_index = 1;
-        } else {
-            report_syntax_error("number or identifier", token_to_string(current_token.type));
-        }
+        parse_expression(); 
+        EMIT("    push eax\n"); 
         eat(TOKEN_RBRACKET);
     }
     
     eat(TOKEN_ASSIGN);
+    parse_expression(); 
     
     if (is_array_access) {
-        parse_expression();
-        if (is_variable_index) {
-            EMIT("    mov ebx, dword [%s]\n", index_name);
-            EMIT("    shl ebx, 2\n");
-            EMIT("    mov dword [%s + ebx], eax\n", var_name);
-        } else {
-            EMIT("    mov dword [%s + %d*4], eax\n", var_name, array_index);
-        }
+        EMIT("    pop ebx\n"); 
+        EMIT("    shl ebx, 2\n");
+        EMIT("    mov dword [%s + ebx], eax\n", var_name);
     } else {
-        parse_expression();
         EMIT("    mov dword [%s], eax\n", var_name);
     }
     
-    // Check for semicolon
+    
     if (current_token.type == TOKEN_SEMICOLON) {
         eat(TOKEN_SEMICOLON);
     } else {
         report_syntax_error("';'", token_to_string(current_token.type));
-        stop_compilation = 1;
     }
 }
 
@@ -545,7 +550,7 @@ void parse_for_statement() {
     int start_label = get_label();
     int end_label = get_label();
     
-    // 1. INITIALIZATION
+    
     if (current_token.type == TOKEN_KEYWORD_INT) {
         parse_declaration();
     } else if (current_token.type == TOKEN_IDENTIFIER) {
@@ -554,23 +559,21 @@ void parse_for_statement() {
         eat(TOKEN_SEMICOLON);
     }
     
-    // 2. CONDITION CHECK
+    
     EMIT(".Lstart%d:\n", start_label);
     
     parse_condition();
     EMIT("    cmp eax, 0\n");
     EMIT("    je .Lend%d\n", end_label);
     
-    // Consume semicolon
+    
     if (current_token.type == TOKEN_SEMICOLON) {
         eat(TOKEN_SEMICOLON);
     } else {
         report_syntax_error("';'", token_to_string(current_token.type));
-        stop_compilation = 1;
-        return;
     }
     
-    // 3. INCREMENT - parse and store in buffer
+    
     char inc_buffer[1000] = "";
     if (current_token.type != TOKEN_RPAREN) {
         FILE *temp = tmpfile();
@@ -592,18 +595,19 @@ void parse_for_statement() {
         
         fflush(temp);
         rewind(temp);
-        fread(inc_buffer, 1, 1000, temp);
+        size_t bytes = fread(inc_buffer, 1, sizeof(inc_buffer) - 1, temp);
+        inc_buffer[bytes] = '\0';
         fclose(temp);
         asm_file = old;
     }
     
-    // Skip to ')'
+    
     while (current_token.type != TOKEN_RPAREN && current_token.type != TOKEN_EOF) {
         next_token();
     }
     eat(TOKEN_RPAREN);
     
-    // 4. BODY
+    
     eat(TOKEN_LBRACE);
     
     while (current_token.type != TOKEN_RBRACE && current_token.type != TOKEN_EOF && !stop_compilation) {
@@ -611,7 +615,7 @@ void parse_for_statement() {
     }
     eat(TOKEN_RBRACE);
     
-    // 5. INCREMENT CODE
+    
     EMIT("%s", inc_buffer);
     
     
@@ -671,7 +675,7 @@ void parse_expression() {
     
     parse_term();
     
-    while (current_token.type == TOKEN_PLUS || current_token.type == TOKEN_MINUS) {
+    while (!stop_compilation && (current_token.type == TOKEN_PLUS || current_token.type == TOKEN_MINUS)) {
         TokenType op = current_token.type;
         eat(op);
         
@@ -693,7 +697,7 @@ void parse_term() {
     
     parse_factor();
     
-    while (current_token.type == TOKEN_STAR || current_token.type == TOKEN_SLASH) {
+    while (!stop_compilation && (current_token.type == TOKEN_STAR || current_token.type == TOKEN_SLASH)) {
         TokenType op = current_token.type;
         eat(op);
         
@@ -719,7 +723,12 @@ void parse_term() {
 void parse_factor() {
     if (stop_compilation) return;
     
-    if (current_token.type == TOKEN_NUMBER) {
+    if (current_token.type == TOKEN_MINUS) {
+        eat(TOKEN_MINUS);
+        parse_factor();
+        EMIT("    neg eax\n");
+    } 
+    else if (current_token.type == TOKEN_NUMBER) {
         EMIT("    mov eax, %d\n", current_token.value);
         eat(TOKEN_NUMBER);
     } 
@@ -729,28 +738,13 @@ void parse_factor() {
         eat(TOKEN_IDENTIFIER);
         
         if (current_token.type == TOKEN_LBRACKET) {
-            
             eat(TOKEN_LBRACKET);
-            
-            if (current_token.type == TOKEN_NUMBER) {
-                
-                int index = current_token.value;
-                eat(TOKEN_NUMBER);
-                EMIT("    mov eax, dword [%s + %d*4]\n", var_name, index);
-            } else if (current_token.type == TOKEN_IDENTIFIER) {
-                
-                char index_name[100];
-                strcpy(index_name, current_token.name);
-                eat(TOKEN_IDENTIFIER);
-                EMIT("    mov ebx, dword [%s]\n", index_name);
-                EMIT("    shl ebx, 2\n");
-                EMIT("    mov eax, dword [%s + ebx]\n", var_name);
-            } else {
-                report_syntax_error("number or identifier", token_to_string(current_token.type));
-            }
+            parse_expression(); 
+            EMIT("    mov ebx, eax\n");
+            EMIT("    shl ebx, 2\n");
+            EMIT("    mov eax, dword [%s + ebx]\n", var_name);
             eat(TOKEN_RBRACKET);
         } else {
-            
             EMIT("    mov eax, dword [%s]\n", var_name);
         }
     }
@@ -763,16 +757,80 @@ void parse_factor() {
     }
 }
 
-int main(int argc, char* argv[]) {
-    printf("=== Mini C Compiler - Complete Edition ===\n");
-    printf("--------------------------------------------\n\n");
+void optimize_and_write_code(FILE *out) {
+    printf(" PASS 3: Optimizing generated code...\n");
+    int i;
+    int optimized_count = 0;
+    
+    for (i = 0; i < instruction_count - 4; i++) {
+        if (!instruction_buffer[i]) continue;
+        
+        
+        if (strstr(instruction_buffer[i], "push eax")) {
+            char *next1 = instruction_buffer[i+1];
+            char *next2 = instruction_buffer[i+2];
+            char *next3 = instruction_buffer[i+3];
+            char *next4 = instruction_buffer[i+4];
+            
+            if (next1 && next2 && next3 && next4 &&
+                strstr(next1, "mov eax,") &&
+                strstr(next2, "mov ebx, eax") &&
+                strstr(next3, "pop eax") &&
+                (strstr(next4, "add eax, ebx") || 
+                 strstr(next4, "sub eax, ebx") || 
+                 strstr(next4, "imul eax, ebx") || 
+                 strstr(next4, "cmp eax, ebx"))) {
+                
+                
+                char operand[100] = {0};
+                sscanf(next1, "    mov eax, %[^\n]", operand);
+                
+                
+                char op[20] = {0};
+                sscanf(next4, "    %s eax, ebx", op);
+                
+                
+                free(instruction_buffer[i]);
+                free(instruction_buffer[i+1]);
+                free(instruction_buffer[i+2]);
+                free(instruction_buffer[i+3]);
+                
+                instruction_buffer[i] = NULL;
+                instruction_buffer[i+1] = NULL;
+                instruction_buffer[i+2] = NULL;
+                instruction_buffer[i+3] = NULL;
+                
+                char new_inst[256];
+                snprintf(new_inst, sizeof(new_inst), "    %s eax, %s\n", op, operand);
+                free(instruction_buffer[i+4]);
+                instruction_buffer[i+4] = strdup(new_inst);
+                
+                optimized_count++;
+            }
+        }
+    }
+    
+    
+    for (i = 0; i < instruction_count; i++) {
+        if (instruction_buffer[i]) {
+            fprintf(out, "%s", instruction_buffer[i]);
+            free(instruction_buffer[i]);
+        }
+    }
+    instruction_count = 0;
+    
+    if (optimized_count > 0) {
+        printf(" Removed %d redundant instructions!\n", optimized_count * 4);
+    }
+}
 
-    if (argc != 3) {
-        printf("Usage: %s input.cmini output.asm\n", argv[0]);
+int main(int argc, char **argv) {
+    if (argc < 3) {
+        printf("Usage: %s <input.cmini> <output.asm>\n", argv[0]);
         return 1;
     }
 
-    FILE* in = fopen(argv[1], "r");
+    FILE* in = fopen(argv[1], "rb");
     if (!in) {
         printf(" ERROR: Cannot open input file '%s'\n", argv[1]);
         return 1;
@@ -783,37 +841,35 @@ int main(int argc, char* argv[]) {
     fseek(in, 0, SEEK_SET);
 
     input = (char*)malloc(size + 1);
-    fread(input, 1, size, in);
-    input[size] = '\0';
+    if (!input) {
+        printf(" ERROR: Memory allocation failed\n");
+        fclose(in);
+        return 1;
+    }
+    size_t bytes_read = fread(input, 1, size, in);
+    input[bytes_read] = '\0';
     fclose(in);
 
+    printf("=== Mini C Compiler - Complete Edition ===\n");
+    printf("--------------------------------------------\n\n");
     printf(" Input file: %s\n", argv[1]);
-    printf(" Source code:\n");
-    printf("---------------\n%s\n", input);
-    printf("---------------\n\n");
+    printf(" Source code:\n---------------\n%s\n---------------\n\n", input);
 
-    // FIRST PASS: Collect variables only
     printf("PASS 1: Collecting variables...\n");
-    position = 0;
-    current_line = 1;
-    error_count = 0;
-    stop_compilation = 0;
     pass_number = 1;
-    asm_file = NULL;
+    stop_compilation = 0;
     next_token();
     parse_program();
-    
+    save_symbols(); 
+
     if (stop_compilation || error_count > 0) {
-        printf("\n Found %d error(s)!\n", error_count);
-        printf(" Compilation aborted.\n");
+        printf("\nFound %d error(s)!\n Compilation aborted.\n", error_count);
         free(input);
         return 1;
     }
-    
-    save_symbols();
+
     printf("Variables collected successfully! (%d variables)\n\n", symbol_count);
-    
-    // SECOND PASS: Generate assembly
+
     printf(" PASS 2: Generating assembly...\n");
     asm_file = fopen(argv[2], "w");
     if (!asm_file) {
@@ -839,8 +895,11 @@ int main(int argc, char* argv[]) {
     label_counter = 0;
     stop_compilation = 0;
     pass_number = 2;
+    instruction_count = 0;
     next_token();
     parse_program();
+
+    optimize_and_write_code(asm_file);
 
     fprintf(asm_file, "    ret\n");
     
