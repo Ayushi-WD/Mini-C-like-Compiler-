@@ -23,9 +23,8 @@
     const assemblyOutput = $('assemblyOutput');
     const tokensOutput = $('tokensOutput');
     const symbolsOutput = $('symbolsOutput');
-    const consoleOutput = $('consoleOutput');
-    const statusIndicator = $('statusIndicator');
     const statusText = $('statusText');
+    const treeOutput = $('treeOutput');
     const consoleBadge = $('consoleBadge');
     const examplesDropdown = $('examplesDropdown');
     const fileUpload = $('fileUpload');
@@ -115,7 +114,9 @@
             contents.forEach(c => c.classList.remove('active'));
             tab.classList.add('active');
             const target = tab.getAttribute('data-tab');
-            document.getElementById('content' + target.charAt(0).toUpperCase() + target.slice(1)).classList.add('active');
+            const contentId = 'content' + target.charAt(0).toUpperCase() + target.slice(1);
+            const content = document.getElementById(contentId);
+            if (content) content.classList.add('active');
         });
     });
 
@@ -170,12 +171,15 @@
 
             
             renderTokens(result.tokens);
-
-            
             renderSymbols(result.symbols);
+            renderConsole(result.logs, result.errors);
 
             
-            renderConsole(result.logs, result.errors);
+            if (result.ast) {
+                renderTree(result.ast, treeOutput);
+            } else {
+                treeOutput.innerHTML = '<div class="output-placeholder-wrapper"><span class="output-placeholder">No parse tree generated</span></div>';
+            }
 
             
             animatePipeline(result.success);
@@ -268,6 +272,149 @@
         });
         html += '</tbody></table>';
         symbolsOutput.innerHTML = html;
+    }
+
+    function renderTree(ast, container) {
+        if (!ast) {
+            container.innerHTML = '<div class="output-placeholder-wrapper"><span class="output-placeholder">No parse tree to display</span></div>';
+            return;
+        }
+
+        const root = document.createElement('div');
+        root.className = 'tree-root';
+        root.appendChild(createTreeNode(ast));
+        container.innerHTML = '';
+        container.appendChild(root);
+    }
+
+    function createTreeNode(node) {
+        if (!node) return document.createTextNode('null');
+
+        const el = document.createElement('div');
+        el.className = 'tree-node';
+
+        const content = document.createElement('div');
+        content.className = `tree-content type-${node.type.toLowerCase()}`;
+
+        const icon = document.createElement('span');
+        icon.className = 'tree-icon';
+        icon.textContent = getNodeIcon(node.type);
+        content.appendChild(icon);
+
+        const typeSpan = document.createElement('span');
+        typeSpan.className = 'tree-type';
+        typeSpan.textContent = node.type;
+        content.appendChild(typeSpan);
+
+        if (node.name) {
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'tree-val';
+            nameSpan.textContent = node.name;
+            content.appendChild(nameSpan);
+        }
+
+        if (node.value !== undefined) {
+            const valSpan = document.createElement('span');
+            valSpan.className = 'tree-val';
+            valSpan.textContent = node.value;
+            content.appendChild(valSpan);
+        }
+
+        if (node.operator) {
+            const opSpan = document.createElement('span');
+            opSpan.className = 'tree-val';
+            opSpan.textContent = (typeof node.operator === 'string') ? node.operator : TOKEN_DISPLAY[node.operator];
+            content.appendChild(opSpan);
+        }
+
+        el.appendChild(content);
+
+        const children = getChildren(node);
+        if (children && children.length > 0) {
+            const childrenContainer = document.createElement('div');
+            childrenContainer.className = 'tree-children';
+            children.forEach(child => {
+                if (child.label) {
+                    const labelNode = document.createElement('div');
+                    labelNode.className = 'tree-node';
+                    const labelContent = document.createElement('div');
+                    labelContent.className = 'tree-content';
+                    labelContent.innerHTML = `<span class="tree-label">${child.label}:</span>`;
+                    labelNode.appendChild(labelContent);
+                    if (child.node) {
+                        labelNode.appendChild(createTreeNode(child.node));
+                    } else if (child.list) {
+                        const listContainer = document.createElement('div');
+                        listContainer.className = 'tree-children';
+                        child.list.forEach(item => listContainer.appendChild(createTreeNode(item)));
+                        labelNode.appendChild(listContainer);
+                    }
+                    childrenContainer.appendChild(labelNode);
+                } else {
+                    childrenContainer.appendChild(createTreeNode(child));
+                }
+            });
+            el.appendChild(childrenContainer);
+        }
+
+        return el;
+    }
+
+    function getNodeIcon(type) {
+        switch (type) {
+            case 'Program': return '📦';
+            case 'Declaration': return '💎';
+            case 'Assignment': return '📝';
+            case 'IfStatement': return '🔀';
+            case 'WhileStatement': return '🔁';
+            case 'ForStatement': return '🔄';
+            case 'PrintStatement': return '📠';
+            case 'BinaryExpression': return '🧮';
+            case 'UnaryExpression': return '➖';
+            case 'Literal': return '🔢';
+            case 'Variable': return '🏷️';
+            case 'ArrayAccess': return '📑';
+            case 'Condition': return '⚖️';
+            default: return '📄';
+        }
+    }
+
+    function getChildren(node) {
+        switch (node.type) {
+            case 'Program': return node.children;
+            case 'Declaration': {
+                const c = [];
+                if (node.initExpr) c.push({ label: 'init', node: node.initExpr });
+                if (node.initValues) c.push({ label: 'values', list: node.initValues.map(v => ({ type: 'Literal', value: v })) });
+                return c;
+            }
+            case 'Assignment': {
+                const c = [];
+                if (node.indexExpr) c.push({ label: 'index', node: node.indexExpr });
+                c.push({ label: 'value', node: node.valueExpr });
+                return c;
+            }
+            case 'IfStatement': {
+                const c = [{ label: 'cond', node: node.condition }, { label: 'then', list: node.thenBody }];
+                if (node.elseBody) c.push({ label: 'else', list: node.elseBody });
+                return c;
+            }
+            case 'WhileStatement': return [{ label: 'cond', node: node.condition }, { label: 'body', list: node.body }];
+            case 'ForStatement': {
+                const c = [];
+                if (node.init) c.push({ label: 'init', node: node.init });
+                c.push({ label: 'cond', node: node.condition });
+                if (node.step) c.push({ label: 'step', node: node.step });
+                c.push({ label: 'body', list: node.body });
+                return c;
+            }
+            case 'PrintStatement': return [node.expression];
+            case 'BinaryExpression': return [node.left, node.right];
+            case 'UnaryExpression': return [node.argument];
+            case 'Condition': return [node.left, node.right];
+            case 'ArrayAccess': return [{ label: 'index', node: node.index }];
+            default: return null;
+        }
     }
 
     function renderConsole(logs, errors) {

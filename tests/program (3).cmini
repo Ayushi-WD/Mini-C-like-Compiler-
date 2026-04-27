@@ -1,0 +1,12 @@
+int arr[3] = {7, 2, 9};
+int max = arr[0];
+
+if (arr[1] > max) {
+    max = arr[1];
+}
+
+if (arr[2] > max) {
+    max = arr[2];
+}
+
+print max;

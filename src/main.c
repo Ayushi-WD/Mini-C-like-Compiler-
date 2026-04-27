@@ -203,9 +203,9 @@ void generate_data_section() {
     fprintf(asm_file, "; Variables\n");
     for (int i = 0; i < symbol_count; i++) {
         if (!symbol_table[i].is_array) {
-            fprintf(asm_file, "    %s dd %d\n", symbol_table[i].name, symbol_table[i].value);
+            fprintf(asm_file, "    %s dq %d\n", symbol_table[i].name, symbol_table[i].value);
         } else {
-            fprintf(asm_file, "    %s times %d dd 0\n", symbol_table[i].name, symbol_table[i].array_size);
+            fprintf(asm_file, "    %s times %d dq 0\n", symbol_table[i].name, symbol_table[i].array_size);
         }
     }
     fprintf(asm_file, "\n");
@@ -426,7 +426,7 @@ void parse_declaration() {
             eat(TOKEN_RBRACE);
         } else {
             parse_expression();
-            EMIT("    mov dword [%s], eax\n", var_name);
+            EMIT("    mov qword [%s], rax\n", var_name);
         }
     }
     
@@ -463,11 +463,11 @@ void parse_assignment() {
     parse_expression(); 
     
     if (is_array_access) {
-        EMIT("    pop ebx\n"); 
-        EMIT("    shl ebx, 2\n");
-        EMIT("    mov dword [%s + ebx], eax\n", var_name);
+        EMIT("    pop rbx\n"); 
+        EMIT("    shl rbx, 2\n");
+        EMIT("    mov qword [%s + rbx], rax\n", var_name);
     } else {
-        EMIT("    mov dword [%s], eax\n", var_name);
+        EMIT("    mov qword [%s], rax\n", var_name);
     }
     
     
@@ -488,7 +488,7 @@ void parse_if_statement() {
     int end_label = get_label();
     
     parse_condition();
-    EMIT("    cmp eax, 0\n");
+    EMIT("    cmp rax, 0\n");
     EMIT("    je .Lelse%d\n", else_label);
     
     eat(TOKEN_RPAREN);
@@ -526,7 +526,7 @@ void parse_while_statement() {
     EMIT(".Lstart%d:\n", start_label);
     
     parse_condition();
-    EMIT("    cmp eax, 0\n");
+    EMIT("    cmp rax, 0\n");
     EMIT("    je .Lend%d\n", end_label);
     
     eat(TOKEN_RPAREN);
@@ -563,7 +563,7 @@ void parse_for_statement() {
     EMIT(".Lstart%d:\n", start_label);
     
     parse_condition();
-    EMIT("    cmp eax, 0\n");
+    EMIT("    cmp rax, 0\n");
     EMIT("    je .Lend%d\n", end_label);
     
     
@@ -586,7 +586,7 @@ void parse_for_statement() {
             eat(TOKEN_IDENTIFIER);
             eat(TOKEN_ASSIGN);
             parse_expression();
-            fprintf(temp, "    mov dword [%s], eax\n", var);
+            fprintf(temp, "    mov qword [%s], rax\n", var);
         } else {
             while (current_token.type != TOKEN_RPAREN && current_token.type != TOKEN_EOF) {
                 next_token();
@@ -628,9 +628,10 @@ void parse_print_statement() {
     
     eat(TOKEN_KEYWORD_PRINT);
     parse_expression();
-    EMIT("    push eax\n");
-    EMIT("    call _print_int\n");
-    EMIT("    add esp, 4\n");
+    EMIT("    mov rcx, rax\n");
+    EMIT("    sub rsp, 32\n");
+    EMIT("    call print_int\n");
+    EMIT("    add rsp, 32\n");
     
     
     if (current_token.type == TOKEN_SEMICOLON) {
@@ -652,19 +653,19 @@ void parse_condition() {
         TokenType op = current_token.type;
         eat(op);
         
-        EMIT("    push eax\n");
+        EMIT("    push rax\n");
         parse_expression();
-        EMIT("    mov ebx, eax\n");
-        EMIT("    pop eax\n");
-        EMIT("    cmp eax, ebx\n");
+        EMIT("    mov rbx, rax\n");
+        EMIT("    pop rax\n");
+        EMIT("    cmp rax, rbx\n");
         
         switch (op) {
-            case TOKEN_EQ: EMIT("    sete al\n    movzx eax, al\n"); break;
-            case TOKEN_NE: EMIT("    setne al\n    movzx eax, al\n"); break;
-            case TOKEN_LT: EMIT("    setl al\n    movzx eax, al\n"); break;
-            case TOKEN_LE: EMIT("    setle al\n    movzx eax, al\n"); break;
-            case TOKEN_GT: EMIT("    setg al\n    movzx eax, al\n"); break;
-            case TOKEN_GE: EMIT("    setge al\n    movzx eax, al\n"); break;
+            case TOKEN_EQ: EMIT("    sete al\n    movzx rax, al\n"); break;
+            case TOKEN_NE: EMIT("    setne al\n    movzx rax, al\n"); break;
+            case TOKEN_LT: EMIT("    setl al\n    movzx rax, al\n"); break;
+            case TOKEN_LE: EMIT("    setle al\n    movzx rax, al\n"); break;
+            case TOKEN_GT: EMIT("    setg al\n    movzx rax, al\n"); break;
+            case TOKEN_GE: EMIT("    setge al\n    movzx rax, al\n"); break;
             default: break;
         }
     }
@@ -679,15 +680,15 @@ void parse_expression() {
         TokenType op = current_token.type;
         eat(op);
         
-        EMIT("    push eax\n");
+        EMIT("    push rax\n");
         parse_term();
-        EMIT("    mov ebx, eax\n");
-        EMIT("    pop eax\n");
+        EMIT("    mov rbx, rax\n");
+        EMIT("    pop rax\n");
         
         if (op == TOKEN_PLUS) {
-            EMIT("    add eax, ebx\n");
+            EMIT("    add rax, rbx\n");
         } else {
-            EMIT("    sub eax, ebx\n");
+            EMIT("    sub rax, rbx\n");
         }
     }
 }
@@ -706,16 +707,16 @@ void parse_term() {
             return;
         }
         
-        EMIT("    push eax\n");
+        EMIT("    push rax\n");
         parse_factor();
-        EMIT("    mov ebx, eax\n");
-        EMIT("    pop eax\n");
+        EMIT("    mov rbx, rax\n");
+        EMIT("    pop rax\n");
         
         if (op == TOKEN_STAR) {
-            EMIT("    imul eax, ebx\n");
+            EMIT("    imul rax, rbx\n");
         } else {
-            EMIT("    xor edx, edx\n");
-            EMIT("    idiv ebx\n");
+            EMIT("    cqo\n");
+            EMIT("    idiv rbx\n");
         }
     }
 }
@@ -726,10 +727,10 @@ void parse_factor() {
     if (current_token.type == TOKEN_MINUS) {
         eat(TOKEN_MINUS);
         parse_factor();
-        EMIT("    neg eax\n");
+        EMIT("    neg rax\n");
     } 
     else if (current_token.type == TOKEN_NUMBER) {
-        EMIT("    mov eax, %d\n", current_token.value);
+        EMIT("    mov rax, %d\n", current_token.value);
         eat(TOKEN_NUMBER);
     } 
     else if (current_token.type == TOKEN_IDENTIFIER) {
@@ -740,12 +741,12 @@ void parse_factor() {
         if (current_token.type == TOKEN_LBRACKET) {
             eat(TOKEN_LBRACKET);
             parse_expression(); 
-            EMIT("    mov ebx, eax\n");
-            EMIT("    shl ebx, 2\n");
-            EMIT("    mov eax, dword [%s + ebx]\n", var_name);
+            EMIT("    mov rbx, rax\n");
+            EMIT("    shl rbx, 2\n");
+            EMIT("    mov rax, qword [%s + rbx]\n", var_name);
             eat(TOKEN_RBRACKET);
         } else {
-            EMIT("    mov eax, dword [%s]\n", var_name);
+            EMIT("    mov rax, qword [%s]\n", var_name);
         }
     }
     else if (current_token.type == TOKEN_LPAREN) {
@@ -766,28 +767,28 @@ void optimize_and_write_code(FILE *out) {
         if (!instruction_buffer[i]) continue;
         
         
-        if (strstr(instruction_buffer[i], "push eax")) {
+        if (strstr(instruction_buffer[i], "push rax")) {
             char *next1 = instruction_buffer[i+1];
             char *next2 = instruction_buffer[i+2];
             char *next3 = instruction_buffer[i+3];
             char *next4 = instruction_buffer[i+4];
             
             if (next1 && next2 && next3 && next4 &&
-                strstr(next1, "mov eax,") &&
-                strstr(next2, "mov ebx, eax") &&
-                strstr(next3, "pop eax") &&
-                (strstr(next4, "add eax, ebx") || 
-                 strstr(next4, "sub eax, ebx") || 
-                 strstr(next4, "imul eax, ebx") || 
-                 strstr(next4, "cmp eax, ebx"))) {
+                strstr(next1, "mov rax,") &&
+                strstr(next2, "mov rbx, rax") &&
+                strstr(next3, "pop rax") &&
+                (strstr(next4, "add rax, rbx") || 
+                 strstr(next4, "sub rax, rbx") || 
+                 strstr(next4, "imul rax, rbx") || 
+                 strstr(next4, "cmp rax, rbx"))) {
                 
                 
                 char operand[100] = {0};
-                sscanf(next1, "    mov eax, %[^\n]", operand);
+                sscanf(next1, "    mov rax, %[^\n]", operand);
                 
                 
                 char op[20] = {0};
-                sscanf(next4, "    %s eax, ebx", op);
+                sscanf(next4, "    %s rax, rbx", op);
                 
                 
                 free(instruction_buffer[i]);
@@ -801,7 +802,7 @@ void optimize_and_write_code(FILE *out) {
                 instruction_buffer[i+3] = NULL;
                 
                 char new_inst[256];
-                snprintf(new_inst, sizeof(new_inst), "    %s eax, %s\n", op, operand);
+                snprintf(new_inst, sizeof(new_inst), "    %s rax, %s\n", op, operand);
                 free(instruction_buffer[i+4]);
                 instruction_buffer[i+4] = strdup(new_inst);
                 
@@ -883,12 +884,14 @@ int main(int argc, char **argv) {
     fprintf(asm_file, "; Generated by Mini C Compiler\n");
     fprintf(asm_file, "; Source: %s\n", argv[1]);
     fprintf(asm_file, "section .data\n");
+    fprintf(asm_file, "    default rel\n");
     generate_data_section();
 
     fprintf(asm_file, "section .text\n");
-    fprintf(asm_file, "    global _our_code\n");
-    fprintf(asm_file, "    extern _print_int\n\n");
-    fprintf(asm_file, "_our_code:\n");
+    fprintf(asm_file, "    global our_code\n");
+    fprintf(asm_file, "    extern print_int\n\n");
+    fprintf(asm_file, "our_code:\n");
+    fprintf(asm_file, "    sub rsp, 8\n");
 
     position = 0;
     current_line = 1;
@@ -901,6 +904,7 @@ int main(int argc, char **argv) {
 
     optimize_and_write_code(asm_file);
 
+    fprintf(asm_file, "    add rsp, 8\n");
     fprintf(asm_file, "    ret\n");
     
     if (stop_compilation || error_count > 0) {

@@ -11,7 +11,7 @@ echo Testing file: tests/%TEST_FILE%
 echo.
 
 echo Step 1: Building compiler...
-gcc src/main.c -o compiler.exe
+C:\mingw64\bin\gcc.exe src/main.c -o compiler.exe
 if %errorlevel% neq 0 (
     echo.
     echo  COMPILER BUILD FAILED!
@@ -38,7 +38,7 @@ echo Assembly generated successfully!
 echo.
 
 echo Step 3: Assembling with NASM...
-nasm -f win32 outputs/program.asm -o outputs/program.obj
+nasm -f win64 outputs/program.asm -o outputs/program.obj
 if %errorlevel% neq 0 (
     echo.
     echo  NASM ASSEMBLY FAILED!
@@ -49,7 +49,7 @@ echo  Assembly successful!
 echo.
 
 echo Step 4: Compiling runtime driver...
-gcc -c runtime/driver.c -o outputs/driver.obj
+C:\mingw64\bin\gcc.exe -c runtime/driver.c -o outputs/driver.obj
 if %errorlevel% neq 0 (
     echo.
     echo  RUNTIME COMPILATION FAILED!
@@ -60,7 +60,7 @@ echo  Runtime compiled successfully!
 echo.
 
 echo Step 5: Linking...
-gcc outputs/driver.obj outputs/program.obj -o outputs/program.exe
+C:\mingw64\bin\gcc.exe outputs/driver.obj outputs/program.obj -o outputs/program.exe
 if %errorlevel% neq 0 (
     echo.
     echo  LINKING FAILED!

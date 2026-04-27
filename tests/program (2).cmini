@@ -1,0 +1,7 @@
+int vals[4] = {5, 10, 15, 20};
+
+vals[1] = 100; 
+print vals[0]; 
+print vals[1]; 
+print vals[2]; 
+print vals[3];

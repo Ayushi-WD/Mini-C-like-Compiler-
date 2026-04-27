@@ -11,3 +11,6 @@ outputs/
 # OS cruft
 Thumbs.db
 Desktop.ini
+
+# Scratch directory
+scratch/

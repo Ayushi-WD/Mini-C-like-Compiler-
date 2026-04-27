@@ -1,0 +1,10 @@
+int a[5] = {10, 20, 30, 40, 50};
+int sum = 0;
+int i = 0;
+
+while (i < 5) {
+    sum = sum + a[i];
+    i = i + 1;
+}
+
+print sum;

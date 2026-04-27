@@ -1,0 +1,9 @@
+int data[4] = {8, 12, 5, 20};
+int i = 0;
+
+while (i < 4) {
+    if (data[i] > 10) {
+        print data[i];
+    }
+    i = i + 1;
+}

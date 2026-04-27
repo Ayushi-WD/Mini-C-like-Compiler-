@@ -123,6 +123,10 @@
                     <span class="panel-tab-dot" style="background: #60a5fa;"></span>
                     Tokens
                 </button>
+                <button class="panel-tab" data-tab="tree" id="tabTree">
+                    <span class="panel-tab-dot" style="background: #f472b6;"></span>
+                    Parse Tree
+                </button>
                 <button class="panel-tab" data-tab="symbols" id="tabSymbols">
                     <span class="panel-tab-dot" style="background: #fbbf24;"></span>
                     Symbols
@@ -142,6 +146,13 @@
                 <div id="tokensOutput" class="tokens-grid">
                     <div class="output-placeholder-wrapper">
                         <span class="output-placeholder">Click "Tokenize" to see the lexical analysis output</span>
+                    </div>
+                </div>
+            </div>
+            <div class="tab-content" id="contentTree">
+                <div id="treeOutput" class="tree-container">
+                    <div class="output-placeholder-wrapper">
+                        <span class="output-placeholder">Parse tree will appear here after compilation</span>
                     </div>
                 </div>
             </div>
