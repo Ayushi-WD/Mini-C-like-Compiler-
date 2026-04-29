@@ -462,6 +462,10 @@ void parse_assignment() {
     eat(TOKEN_ASSIGN);
     parse_expression(); 
     
+    if (pass_number == 2) {
+        get_symbol(var_name);
+    }
+    
     if (is_array_access) {
         EMIT("    pop rbx\n"); 
         EMIT("    shl rbx, 2\n");
@@ -738,6 +742,10 @@ void parse_factor() {
         strcpy(var_name, current_token.name);
         eat(TOKEN_IDENTIFIER);
         
+        if (pass_number == 2) {
+            get_symbol(var_name);
+        }
+
         if (current_token.type == TOKEN_LBRACKET) {
             eat(TOKEN_LBRACKET);
             parse_expression(); 

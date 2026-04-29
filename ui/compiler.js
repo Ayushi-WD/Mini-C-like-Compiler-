@@ -425,6 +425,8 @@ class MiniCCompiler {
         }
         this.eat(TokenType.ASSIGN);
         const valueExpr = this.parseExpression();
+        this.getSymbol(varName);
+
         if (isArrayAccess) {
             this.emit(`    pop ebx`);
             this.emit(`    shl ebx, 2`);
@@ -662,6 +664,8 @@ class MiniCCompiler {
         } else if (this.currentToken.type === TokenType.IDENTIFIER) {
             const varName = this.currentToken.name;
             this.eat(TokenType.IDENTIFIER);
+            this.getSymbol(varName);
+
             if (this.currentToken.type === TokenType.LBRACKET) {
                 this.eat(TokenType.LBRACKET);
                 const index = this.parseExpression();
